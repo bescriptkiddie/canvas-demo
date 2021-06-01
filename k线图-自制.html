@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>k线图</title>
+  <style type="text/css">
+    canvas {
+      border: 1px solid black;
+    }
+  </style>
+</head>
+
+<body>
+  <div id="myCanvas" height="500" width="1200">
+
+    <script type="text/javascript">
+      const canvasBox = document.getElementById("myCanvas");
+
+      function draw(cBox, data) {
+        let canvas, ctx;
+        // 图属性
+        let bMargin, bWidth, maxValue, minValue, totalBars; // 柱块属性
+        let scale; // 显示的刻度
+        let showArr; // 需要显示的数据
+
+        let points = []; // 绘制曲线的点
+
+        canvas = document.createElement("canvas");
+        canvas.style.border = "0px" // 清除边框
+        // ctx = canvas.getContext("2d");
+        // 判断是否可以
+        if (canvas && canvas.getContext) {
+          ctx = canvas.getContext("2d");
+        }
+        cBox.appendChild(canvas);
+
+        initChart()
+        // 初始化图表的坐标系
+        function initChart() {
+          // 图表信息
+          cMargin = 60;
+          cSpace = 80;
+          //将canvas扩大2倍，然后缩小，以适应高清屏幕
+          canvas.width = cBox.getAttribute("width") * 2;
+          canvas.height = cBox.getAttribute("height") * 2;
+          canvas.style.height = canvas.height / 2 + "px";
+          canvas.style.width = canvas.width / 2 + "px";
+          cHeight = canvas.height - cMargin * 2 - cSpace * 2;
+          cWidth = canvas.width - cMargin * 2 - cSpace * 2;
+          originX = cMargin + cSpace;
+          originY = cMargin + cHeight;
+
+          // 柱状图相关
+          showArr = dataArr.slice(0, parseInt(dataArr.length / 2));
+
+          // 柱状图信息
+          tobalBars = showArr.length;
+          bWidth = parseInt(cWidth / tobalBars / 3);
+          bMargin = parseInt((cWidth - bWidth * tobalBars) / (tobalBars + 1));
+          maxValue = 0;
+          minValue = 9999999;
+          // 遍历去最大最小值
+          for (let i = 0; i < dataArr.length; i++) {
+            let barVal = dataArr[i][1][3];
+            if (barVal > maxValue) {
+              maxValue = barVal;
+            }
+            let barVal2 = dataArr[i][1][2];
+            if (barVal2 < minValue) {
+              minValue = barVal2;
+            }
+          }
+          maxValue += 20; // 留白
+          minValue -= 20;
+          scale = 10;
+        }
+        // 绘制坐标系 -> 有x,y轴,标记,刻度
+        function drawzbx() {
+          ctx.font = "24px Arial";
+          ctx.lineWidth = 2;
+          ctx.fillStyle = "#000";
+          ctx.strokeStyle = '#000';
+          // y轴
+          drawLine(originX, originY, originX, cMargin);
+          // x轴
+          drawLine(originX, originY, originX + cWidth, originY);
+          // 绘制刻度
+          drawScale()
+        }
+
+        // 画线
+        function drawLine(x, y, X, Y) {
+          ctx.beginPath();
+          ctx.moveTo(x, y);
+          ctx.lineTo(X, Y);
+          ctx.stroke(); // 绘制路径
+          ctx.closePath();
+        }
+
+        // 绘制刻度 --> 需要先画线
+        function drawScale() {
+          ctx.strokeStyle = '#E0E0E0';
+          // 绘制 y 轴  => 最大减去最小的,然后除以y轴的长度
+          let oneVal = (maxValue - minValue) / scale; // 一刻度
+          ctx.textAlign = "right";
+          for (let i = 0; i <= scale; i++) {
+            let markerVal = parseInt(i * oneVal + minValue);;
+            let xMarker = originX - 10;
+            let yMarker = parseInt(originY - cHeight * (markerVal - minValue) / (maxValue - minValue));
+
+            ctx.fillText(markerVal, xMarker, yMarker + 10, cSpace);
+            if (i > 0) {
+              drawLine(originX + 2, yMarker, originX + cWidth, yMarker);
+            }
+          }
+
+          // 绘制 x
+          let nextDay = 6; // 下一个坐标
+          ctx.textAlign = "center";
+          for (let i = 0; i < tobalBars; i++) {
+            if (tobalBars > nextDay && i % parseInt(tobalBars / 6) != 0) {
+              continue;
+            }
+            let markerVal = dataArr[i][0];
+            let xMarker = parseInt(originX + cWidth * (i / tobalBars) + bMargin + bWidth / 2);
+            let yMarker = originY + 30;
+            ctx.fillText(markerVal, xMarker, yMarker, cSpace); // 文字(文本,坐标x,y,最大宽度)
+          }
+          // 绘制 y轴
+          ctx.save();
+          ctx.rotate(-Math.PI / 2); // 将text旋转
+          ctx.fillText("指 数", -canvas.height / 2, cSpace - 20);
+          ctx.restore();
+          // 绘制 x轴
+          ctx.fillText("日 期", originX + cWidth / 2, originY + cSpace - 20);
+        }
+
+
+        // 绘制柱形图 --> 画色块 , 画曲线 (合在一起是因为处理数据)
+        function drawBarAnimate() {
+
+          for (let i = 0; i < tobalBars; i++) {
+            let oneVal = parseInt(maxValue / scale);
+            let data = dataArr[i][1];
+            let color = "#30C7C9";
+            let barVal = data[0];
+            let disY = 0;
+            //开盘0 收盘1 最低2 最高3
+            if (data[1] > data[0]) { //涨
+              color = "#D7797F";
+              barVal = data[1];
+              disY = data[1] - data[0];
+            } else {
+              disY = data[0] - data[1];
+            }
+            let showH = disY / (maxValue - minValue) * cHeight;
+            showH = showH > 2 ? showH : 2;
+
+            let barH = parseInt(cHeight * (barVal - minValue) / (maxValue - minValue));
+            let y = originY - barH; // 开盘y
+            let x = originX + ((bWidth + bMargin) * i + bMargin);
+            let py = (originY - barH) / 2;
+            let px = originX + ((bWidth + bMargin) * i + bMargin) + bWidth / 2;
+
+            points.push({ x: px, y: py });
+
+            //开盘收盘
+            drawRect(x, y, bWidth, showH, color, true);
+
+            // 影线
+            showH = (data[3] - data[2]) / (maxValue - minValue) * cHeight;
+            showH = showH > 2 ? showH : 2; // 给他一个最小值
+            y = originY - parseInt(cHeight * (data[3] - minValue) / (maxValue - minValue));
+
+            //最高最低
+            drawRect(parseInt(x + bWidth / 2 - 1), y, 2, showH, color);
+          }
+        }
+
+        // point 是一个数组 
+        function drawBezier(point, num) {
+          ctx.strokeStyle = 'red';
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          // ctx.font = "20px SimSun";
+          // ctx.fillStyle = "red";
+          for (i = 0; i < point.length; i++) {
+            if (i < 1) {
+              ctx.moveTo(point[i].x, point[i].y);
+            } else { //注意是从1开始
+              let ctrlP = getCtrlPoint(point, i - 1);
+              // 两个控制点,一个终点
+              ctx.bezierCurveTo(ctrlP.pA.x, ctrlP.pA.y, ctrlP.pB.x, ctrlP.pB.y, point[i].x, point[i].y);
+            }
+          }
+          ctx.stroke();
+        }
+
+        // 网上抄的,决定控制点的代码
+        function getCtrlPoint(ps, i, a, b) {
+          if (!a || !b) {
+            a = 0.25;
+            b = 0.25;
+          }
+          //处理两种极端情形
+          if (i < 1) {
+            var pAx = ps[0].x + (ps[1].x - ps[0].x) * a;
+            var pAy = ps[0].y + (ps[1].y - ps[0].y) * a;
+          } else {
+            var pAx = ps[i].x + (ps[i + 1].x - ps[i - 1].x) * a;
+            var pAy = ps[i].y + (ps[i + 1].y - ps[i - 1].y) * a;
+          }
+          if (i > ps.length - 3) {
+            var last = ps.length - 1
+            var pBx = ps[last].x - (ps[last].x - ps[last - 1].x) * b;
+            var pBy = ps[last].y - (ps[last].y - ps[last - 1].y) * b;
+          } else {
+            var pBx = ps[i + 1].x - (ps[i + 2].x - ps[i].x) * b;
+            var pBy = ps[i + 1].y - (ps[i + 2].y - ps[i].y) * b;
+          }
+          console.log({
+            pA: { x: pAx, y: pAy },
+            pB: { x: pBx, y: pBy }
+          })
+          return {
+            pA: { x: pAx, y: pAy },
+            pB: { x: pBx, y: pBy }
+          }
+        }
+
+        //绘制方块
+        function drawRect(x, y, X, Y, color) {
+          ctx.beginPath();
+          // 绘制矩形
+          ctx.rect(parseInt(x), parseInt(y), parseInt(X), parseInt(Y));
+          ctx.fillStyle = color;
+          ctx.fill();
+          ctx.closePath();
+        }
+        drawzbx()
+        drawBarAnimate()
+        drawBezier(points, 5)
+      }
+      const dataArr = [
+        ["2021/04/1", [2320.26, 2302.6, 2287.3, 2362.94]],
+        ["2021/04/2", [2300, 2291.3, 2288.26, 2308.38]],
+        ["2021/04/3", [2295.35, 2346.5, 2295.35, 2346.92]],
+        ["2021/04/4", [2347.22, 2358.98, 2337.35, 2363.8]],
+        ["2021/04/5", [2360.75, 2382.48, 2347.89, 2383.76]],
+        ["2021/04/6", [2383.43, 2385.42, 2371.23, 2391.82]],
+        ["2021/04/7", [2377.41, 2419.02, 2369.57, 2421.15]],
+        ["2021/04/8", [2425.92, 2428.15, 2417.58, 2440.38]],
+        ["2021/04/9", [2411, 2433.13, 2403.3, 2437.42]],
+        ["2021/04/10", [2432.68, 2434.48, 2427.7, 2441.73]],
+        ["2021/04/11", [2430.69, 2418.53, 2394.22, 2433.89]],
+        ["2021/04/12", [2416.62, 2432.4, 2414.4, 2443.03]],
+        ["2021/04/13", [2441.91, 2421.56, 2415.43, 2444.8]],
+        ["2021/04/14", [2420.26, 2382.91, 2373.53, 2427.07]],
+        ["2021/04/15", [2383.49, 2397.18, 2370.61, 2397.94]],
+        ["2021/04/16", [2378.82, 2325.95, 2309.17, 2378.82]],
+        ["2021/04/17", [2322.94, 2314.16, 2308.76, 2330.88]],
+        ["2021/04/18", [2320.62, 2325.82, 2315.01, 2338.78]],
+        ["2021/04/19", [2313.74, 2293.34, 2289.89, 2340.71]],
+        ["2021/04/20", [2297.77, 2313.22, 2292.03, 2324.63]],
+        ["2021/04/21", [2322.32, 2365.59, 2308.92, 2366.16]],
+        ["2021/04/22", [2364.54, 2359.51, 2330.86, 2369.65]],
+        ["2021/04/23", [2332.08, 2273.4, 2259.25, 2333.54]],
+        ["2021/04/24", [2274.81, 2326.31, 2270.1, 2328.14]],
+        ["2021/04/25", [2333.61, 2347.18, 2321.6, 2351.44]],
+        ["2021/04/26", [2340.44, 2324.29, 2304.27, 2352.02]],
+        ["2021/04/27", [2326.42, 2318.61, 2314.59, 2333.67]],
+        ["2021/04/28", [2314.68, 2310.59, 2296.58, 2320.96]],
+        ["2021/04/29", [2309.16, 2286.6, 2264.83, 2333.29]],
+        ["2021/04/30", [2282.17, 2263.97, 2253.25, 2286.33]],
+        ["2020/11/1", [2320.26, 2302.6, 2287.3, 2362.94]],
+        ["2020/11/2", [2300, 2291.3, 2288.26, 2308.38]],
+        ["2020/11/3", [2295.35, 2346.5, 2295.35, 2346.92]],
+        ["2020/11/4", [2347.22, 2358.98, 2337.35, 2363.8]],
+        ["2020/11/5", [2360.75, 2382.48, 2347.89, 2383.76]],
+        ["2020/11/6", [2383.43, 2385.42, 2371.23, 2391.82]],
+        ["2020/11/7", [2377.41, 2419.02, 2369.57, 2421.15]],
+        ["2020/11/8", [2425.92, 2428.15, 2417.58, 2440.38]],
+        ["2020/11/9", [2411, 2433.13, 2403.3, 2437.42]],
+        ["2020/11/10", [2432.68, 2434.48, 2427.7, 2441.73]],
+        ["2020/11/11", [2430.69, 2418.53, 2394.22, 2433.89]],
+        ["2020/11/12", [2416.62, 2432.4, 2414.4, 2443.03]],
+        ["2020/11/13", [2441.91, 2421.56, 2415.43, 2444.8]],
+        ["2020/11/14", [2420.26, 2382.91, 2373.53, 2427.07]],
+        ["2020/11/15", [2383.49, 2397.18, 2370.61, 2397.94]],
+        ["2020/11/16", [2378.82, 2325.95, 2309.17, 2378.82]],
+        ["2020/11/17", [2322.94, 2314.16, 2308.76, 2330.88]],
+        ["2020/11/18", [2320.62, 2325.82, 2315.01, 2338.78]],
+        ["2020/11/19", [2313.74, 2293.34, 2289.89, 2340.71]],
+        ["2020/11/20", [2297.77, 2313.22, 2292.03, 2324.63]],
+        ["2020/11/21", [2322.32, 2365.59, 2308.92, 2366.16]],
+        ["2020/11/22", [2364.54, 2359.51, 2330.86, 2369.65]],
+        ["2020/11/23", [2332.08, 2273.4, 2259.25, 2333.54]],
+        ["2020/11/24", [2274.81, 2326.31, 2270.1, 2328.14]],
+        ["2020/11/25", [2333.61, 2347.18, 2321.6, 2351.44]],
+        ["2020/11/26", [2340.44, 2324.29, 2304.27, 2352.02]],
+        ["2020/11/27", [2326.42, 2318.61, 2314.59, 2333.67]],
+        ["2020/11/28", [2314.68, 2310.59, 2296.58, 2320.96]],
+        ["2020/11/29", [2309.16, 2286.6, 2264.83, 2333.29]],
+        ["2020/11/30", [2282.17, 2263.97, 2253.25, 2286.33]]
+      ];
+      draw(canvasBox, dataArr)
+    </script>
+</body>
+
+</html>
